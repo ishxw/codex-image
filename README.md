@@ -30,6 +30,7 @@ py --version
 ```text
 ~/.claude/settings.json
 ```
+或
 ```text
 ~/.codex/settings.json
 ```
@@ -38,7 +39,7 @@ py --version
 
 - `env.ANTHROPIC_BASE_URL`
 - `env.ANTHROPIC_AUTH_TOKEN`
-
+或
 - `env.OPENAI_BASE_URL`
 - `env.OPENAI_API_KEY`
 
@@ -68,6 +69,7 @@ gen-images/
 ```text
 ~/.claude/skills/
 ```
+或
 ```text
 ~/.codex/skills/
 ```
@@ -85,6 +87,7 @@ Windows 下通常对应：
 ```text
 C:\Users\<用户名>\.claude\skills\gen-images\
 ```
+或
 ```text
 C:\Users\<用户名>\.codex\skills\gen-images\
 ```
