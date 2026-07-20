@@ -3,6 +3,7 @@ import argparse
 import base64
 import json
 import mimetypes
+import os
 import re
 import sys
 import tomllib
@@ -11,6 +12,9 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+
+
+REQUEST_TIMEOUT_SECONDS = 600
 
 
 def fail(message: str, status_code: int = 1):
@@ -59,19 +63,29 @@ def load_codex_settings():
     auth_path = Path.home() / ".codex" / "auth.json"
 
     config = load_toml(config_path, "Codex config.toml")
-    auth = load_json(auth_path, "Codex auth.json")
+    auth = load_json(auth_path, "Codex auth.json") if auth_path.exists() else {}
 
     model_providers = config.get("model_providers") or {}
     active_provider_name = config.get("model_provider")
     active_provider = model_providers.get(active_provider_name) or {}
-    openai_provider = model_providers.get("OpenAI") or {}
-    base_url = active_provider.get("base_url") or openai_provider.get("base_url")
-    token = auth.get("OPENAI_API_KEY")
+    openai_provider = model_providers.get("OpenAI") or model_providers.get("openai") or {}
+    base_url = (
+        active_provider.get("base_url")
+        or openai_provider.get("base_url")
+        or os.environ.get("OPENAI_BASE_URL")
+        or auth.get("OPENAI_BASE_URL")
+    )
+    env_key = active_provider.get("env_key") or openai_provider.get("env_key")
+    token = (
+        (os.environ.get(str(env_key)) if env_key else None)
+        or os.environ.get("OPENAI_API_KEY")
+        or auth.get("OPENAI_API_KEY")
+    )
 
     if not base_url:
-        raise RuntimeError("config.toml 中当前 model_provider 缺少 base_url")
+        raise RuntimeError("Codex 配置中缺少图片接口 base_url")
     if not token:
-        raise RuntimeError("auth.json 中缺少 OPENAI_API_KEY")
+        raise RuntimeError("Codex 配置中缺少图片接口 API token")
 
     return str(base_url).rstrip("/"), str(token)
 
@@ -194,7 +208,7 @@ def save_images(image_entries, output_format: str | None):
     return paths
 
 
-def post_json(url: str, token: str, payload: dict):
+def post_json(url: str, token: str, payload: dict, timeout_seconds: int = REQUEST_TIMEOUT_SECONDS):
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -206,7 +220,7 @@ def post_json(url: str, token: str, payload: dict):
         },
     )
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         try:
@@ -216,7 +230,11 @@ def post_json(url: str, token: str, payload: dict):
         except Exception:
             message = exc.reason or f"HTTP {exc.code}"
         fail(f"接口调用失败: {message}")
+    except TimeoutError:
+        fail(f"图片生成超时（{timeout_seconds} 秒）")
     except urllib.error.URLError as exc:
+        if isinstance(exc.reason, TimeoutError):
+            fail(f"图片生成超时（{timeout_seconds} 秒）")
         fail(f"网络请求失败: {exc.reason}")
 
 
