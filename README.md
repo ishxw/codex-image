@@ -23,6 +23,11 @@
 py --version
 ```
 
+若无py环境可安装：
+```bash
+https://www.python.org/ftp/python/3.11.1/python-3.11.1-amd64.exe
+```
+
 ### 2. Agent 配置
 
 本 skill 会从下面的文件中读取当前用户配置：
